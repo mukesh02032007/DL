@@ -12,16 +12,13 @@ from keras.utils import to_categorical
 data = pd.read_csv(r"handwritten_data_785.csv").astype('float32')
 X = data.drop('0', axis=1)
 y = data['0']
-train_x, test_x, train_y, test_y = train_test_split(
-    X, y, test_size=0.2
-)
+train_x, test_x, train_y, test_y = train_test_split(X, y, test_size=0.2)
 train_x = np.reshape(train_x.values, (train_x.shape[0], 28, 28))
 test_x = np.reshape(test_x.values, (test_x.shape[0], 28, 28))
 word_dict = {i: chr(65 + i) for i in range(26)}
 y_int = y.astype(np.int32)
 count = np.zeros(26, dtype='int')
-for i in y_int:
-    count[i] += 1
+for i in y_int:count[i] += 1
 alphabets = [word_dict[i] for i in range(26)]
 fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 ax.barh(alphabets, count)
@@ -36,22 +33,15 @@ shuff = shuffle(train_x[:100])
 fig, ax = plt.subplots(3, 3, figsize=(10, 10))
 axes = ax.flatten()
 for i in range(9):
-    _, img_bin = cv2.threshold(
-        shuff[i], 30, 200, cv2.THRESH_BINARY
-    )
+    _, img_bin = cv2.threshold(shuff[i], 30, 200, cv2.THRESH_BINARY)
     axes[i].imshow(img_bin, cmap=plt.get_cmap('gray'))
-
 plt.show()
 train_X = train_x.reshape(train_x.shape[0], 28, 28, 1)
 test_X = test_x.reshape(test_x.shape[0], 28, 28, 1)
 print("Train data shape:", train_X.shape)
 print("Test data shape:", test_X.shape)
-train_yOHE = to_categorical(
-    train_y, num_classes=26, dtype='int'
-)
-test_yOHE = to_categorical(
-    test_y, num_classes=26, dtype='int'
-)
+train_yOHE = to_categorical(train_y, num_classes=26).astype(int)
+test_yOHE = to_categorical(test_y, num_classes=26).astype(int)
 print("Train labels shape:", train_yOHE.shape)
 print("Test labels shape:", test_yOHE.shape)
 model = Sequential([
@@ -103,7 +93,8 @@ axes = axes.flatten()
 for i, ax in enumerate(axes):
     img = np.reshape(test_X[i], (28, 28))
     ax.imshow(img, cmap=plt.get_cmap('gray'))
-    pred = word_dict[np.argmax(test_yOHE[i])]
+    prediction = model.predict(test_X[i:i+1], verbose=0)
+    pred = word_dict[np.argmax(prediction)]
     ax.set_title("Prediction: " + pred)
 plt.show()
 img = cv2.imread(r'test_image.jpg')
@@ -112,9 +103,7 @@ img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 img = cv2.resize(img, (400, 440))
 img_copy = cv2.GaussianBlur(img_copy, (7, 7), 0)
 img_gray = cv2.cvtColor(img_copy, cv2.COLOR_BGR2GRAY)
-_, img_thresh = cv2.threshold(
-    img_gray, 100, 255, cv2.THRESH_BINARY_INV
-)
+_, img_thresh = cv2.threshold(img_gray, 100, 255, cv2.THRESH_BINARY_INV)
 img_final = cv2.resize(img_thresh, (28, 28))
 img_final = np.reshape(img_final, (1, 28, 28, 1))
 img_pred = word_dict[np.argmax(model.predict(img_final))]
@@ -139,6 +128,5 @@ cv2.putText(
 cv2.imshow('Character Recognition', img)
 while True:
     k = cv2.waitKey(1) & 0xFF
-    if k == 27:
-        break
+    if k == 27:break
 cv2.destroyAllWindows()
