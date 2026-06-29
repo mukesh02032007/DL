@@ -1,99 +1,143 @@
 import numpy as np
 import pandas as pd
-from sklearn.datasets import fetch_lfw_people
 import matplotlib.pyplot as plt
 import seaborn as sns
-from collections import Counter
-from tensorflow.keras.utils import to_categorical
+from sklearn.datasets import fetch_lfw_people
 from sklearn.model_selection import train_test_split
-from keras.models import Sequential
-from keras.layers import Dense, Conv2D, MaxPooling2D, Flatten
 from sklearn.metrics import confusion_matrix
-import keras.utils as image
-# Load dataset
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dense
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.preprocessing import image
+from collections import Counter
+# Load Dataset
 faces = fetch_lfw_people(
     min_faces_per_person=100,
     resize=1.0,
     slice_=(slice(60, 188), slice(60, 188)),
-    color=True
+    color=False   # <-- use grayscale
 )
-class_count = len(faces.target_names)
+print("Classes:")
 print(faces.target_names)
+print("\nImage shape:")
 print(faces.images.shape)
-# Display sample images
-sns.set()
-fig, ax = plt.subplots(3, 6, figsize=(18, 10))
-for i, axi in enumerate(ax.flat):
-    axi.imshow(faces.images[i] / 255)  # Scale pixel values
-    axi.set(xticks=[], yticks=[], xlabel=faces.target_names[faces.target[i]])
-# Count images per person
-counts = Counter(faces.target)
-names = {faces.target_names[key]: counts[key] for key in counts.keys()}
-df = pd.DataFrame.from_dict(names, orient='index')
-df.plot(kind='bar')
-# Select 100 images per person
-mask = np.zeros(faces.target.shape, dtype=bool)
-for target in np.unique(faces.target):
-    mask[np.where(faces.target == target)[0][:100]] = 1
-x_faces = faces.data[mask]
-y_faces = faces.target[mask]
-x_faces = np.reshape(
-    x_faces,
-    (x_faces.shape[0], faces.images.shape[1], faces.images.shape[2], faces.images.shape[3])
-)
-# Normalize and one-hot encode
-face_images = x_faces / 255
-face_labels = to_categorical(y_faces)
-# Train-test split
+# Display Sample Images
+fig, ax = plt.subplots(3, 6, figsize=(15, 8))
+for i, a in enumerate(ax.flat):
+    if i < len(faces.images):
+        a.imshow(faces.images[i], cmap="gray")
+        a.set_xlabel(faces.target_names[faces.target[i]])
+    a.set_xticks([])
+    a.set_yticks([])
+plt.tight_layout()
+plt.show()
+# Class Distribution
+pd.DataFrame.from_dict(
+    {faces.target_names[k]: v for k, v in Counter(faces.target).items()},
+    orient='index',
+    columns=['Count']
+).plot(kind='bar', legend=False)
+plt.title("Class Distribution")
+plt.ylabel("Images")
+plt.show()
+# Select 100 Images Per Class
+mask = np.zeros(len(faces.target), dtype=bool)
+for t in np.unique(faces.target):
+    idx = np.where(faces.target == t)[0]
+    mask[idx[:min(100, len(idx))]] = True
+X = faces.images[mask].astype("float32") / 255.0
+X = np.expand_dims(X, axis=-1)  # add channel dimension (grayscale → 1)
+# Integer labels
+y_labels = faces.target[mask]
+# One-hot labels
+y = to_categorical(y_labels)
+# Train-Test Split
 x_train, x_test, y_train, y_test = train_test_split(
-    face_images, face_labels,
-    train_size=0.8,
-    stratify=face_labels,
-    random_state=0
+    X,
+    y,
+    test_size=0.2,
+    stratify=y_labels,
+    random_state=42
 )
-# Build CNN model
-model = Sequential()
-model.add(Conv2D(32, (3, 3), activation='relu', input_shape=face_images.shape[1:]))
-model.add(MaxPooling2D(2, 2))
-model.add(Conv2D(64, (3, 3), activation='relu'))
-model.add(MaxPooling2D(2, 2))
-model.add(Conv2D(64, (3, 3), activation='relu'))
-model.add(MaxPooling2D(2, 2))
-model.add(Flatten())
-model.add(Dense(128, activation='relu'))
-model.add(Dense(class_count, activation='softmax'))
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+print("Training shape:", x_train.shape)
+print("Testing shape :", x_test.shape)
+# CNN Model
+input_shape = (X.shape[1], X.shape[2], 1)
+model = Sequential([
+    Input(shape=input_shape),
+    Conv2D(32, (3, 3), activation='relu'),
+    MaxPooling2D((2, 2)),
+    Conv2D(64, (3, 3), activation='relu'),
+    MaxPooling2D((2, 2)),
+    Conv2D(64, (3, 3), activation='relu'),
+    MaxPooling2D((2, 2)),
+    Flatten(),
+    Dense(128, activation='relu'),
+    Dense(len(faces.target_names), activation='softmax')
+])
+model.compile(
+    optimizer='adam',
+    loss='categorical_crossentropy',
+    metrics=['accuracy']
+)
 model.summary()
-# Train model
-hist = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=20, batch_size=25)
-# Plot accuracy
-acc = hist.history['accuracy']
-val_acc = hist.history['val_accuracy']
-epochs = range(1, len(acc) + 1)
-plt.plot(epochs, acc, '-', label='Training Accuracy')
-plt.plot(epochs, val_acc, ':', label='Validation Accuracy')
-plt.title('Training and Validation Accuracy')
-plt.xlabel('Epoch')
-plt.ylabel('Accuracy')
-plt.legend(loc='lower right')
+# Train Model
+history = model.fit(
+    x_train,
+    y_train,
+    validation_data=(x_test, y_test),
+    epochs=20,
+    batch_size=25,
+    verbose=1
+)
+# Accuracy Plot
+plt.figure(figsize=(8, 5))
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.title("Training vs Validation Accuracy")
+plt.legend()
+plt.grid(True)
 plt.show()
-# Confusion matrix
-y_predicted = model.predict(x_test)
-mat = confusion_matrix(y_test.argmax(axis=1), y_predicted.argmax(axis=1))
-sns.heatmap(mat.T, square=True, annot=True, fmt='d', cbar=False, cmap='Blues',
-            xticklabels=faces.target_names,
-            yticklabels=faces.target_names)
-plt.xlabel('Predicted label')
-plt.ylabel('Actual label')
+# Confusion Matrix
+pred = model.predict(x_test)
+cm = confusion_matrix(
+    np.argmax(y_test, axis=1),
+    np.argmax(pred, axis=1)
+)
+plt.figure(figsize=(8, 6))
+sns.heatmap(
+    cm,
+    annot=True,
+    fmt='d',
+    cmap='Blues',
+    xticklabels=faces.target_names,
+    yticklabels=faces.target_names
+)
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("Confusion Matrix")
 plt.show()
-# Test with custom image
-x = image.load_img('george.jpg', target_size=face_images.shape[1:])
-plt.xticks([])
-plt.yticks([])
-plt.imshow(x)
+# Predict New Image
+image_path = "george.jpg"   # Change path if needed
+img = image.load_img(
+    image_path,
+    target_size=(X.shape[1], X.shape[2]),
+    color_mode='grayscale'   # <-- match training data
+)
+plt.imshow(img, cmap="gray")
+plt.title("Test Image")
+plt.axis("off")
 plt.show()
-x = image.img_to_array(x) / 255
-x = np.expand_dims(x, axis=0)
-y = model.predict(x)[0]
-for i in range(len(y)):
-    print(f"{faces.target_names[i]}: {y[i]}")
+img_array = image.img_to_array(img) / 255.0
+img_array = np.expand_dims(img_array, axis=0)  # shape (1,128,128,1)
+result = model.predict(img_array)[0]
+print("\nPrediction Probabilities:\n")
+for name, prob in zip(faces.target_names, result):
+    print(f"{name:25s}: {prob:.4f}")
+predicted_class = np.argmax(result)
+print("\nPredicted Person:")
+print(faces.target_names[predicted_class])
+print("Confidence:")
+print(f"{result[predicted_class] * 100:.2f}%")
