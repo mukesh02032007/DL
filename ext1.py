@@ -1,22 +1,21 @@
+# 1. Import libraries
 import numpy as np
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
-# XOR dataset
-X = np.array([[0,0],
-              [0,1],
-              [1,0],
-              [1,1]])
+# 2. XOR Dataset
+X = np.array([[0,0],[0,1],[1,0],[1,1]])
 Y = np.array([[0],[1],[1],[0]])
-# Build Model
+# 3. Create Model
 model = Sequential()
-model.add(Dense(8, input_dim=2, activation='relu'))
-model.add(Dense(4, activation='relu'))
-model.add(Dense(1, activation='sigmoid'))
+# 4. Hidden Layer
+model.add(Dense(8,input_dim=2,activation='relu'))
+# 5. Output Layer
+model.add(Dense(1,activation='sigmoid'))
+# 6. Compile
 model.compile(loss='binary_crossentropy',
-              optimizer='adam',
-              metrics=['accuracy'])
-model.fit(X, Y, epochs=1000, verbose=0)
-prediction = model.predict(X)
-print("Predictions")
-for i in range(len(X)):
-    print(X[i], "=", round(prediction[i][0]))
+optimizer='adam',
+metrics=['accuracy'])
+# 7. Train
+model.fit(X,Y,epochs=100)
+# 8. Predict
+print(model.predict(X))
