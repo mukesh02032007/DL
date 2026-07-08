@@ -16,6 +16,14 @@ model.compile(loss='binary_crossentropy',
 optimizer='adam',
 metrics=['accuracy'])
 # 7. Train
-model.fit(X,Y,epochs=100)
+# Train and save history
+history = model.fit(X, Y, epochs=100, verbose=0)
+# Plot Cost (Loss) vs Iteration (Epoch)
+plt.plot(history.history['loss'])
+plt.title('Cost per Iteration')
+plt.xlabel('Epoch')
+plt.ylabel('Cost (Loss)')
+plt.grid(True)
+plt.show()
 # 8. Predict
 print(model.predict(X))
