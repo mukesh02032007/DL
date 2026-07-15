@@ -110,7 +110,7 @@ model.compile(
     optimizer="adam",
     metrics=["accuracy"]
 )
-
+model.build(input_shape=(None, max_length))
 model.summary()
 
 # Train model
