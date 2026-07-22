@@ -1,0 +1,6 @@
+DT
+NN
+VBD
+IN
+.
+RB
